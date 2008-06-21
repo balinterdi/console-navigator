@@ -7,6 +7,7 @@ require "test/unit"
 require "yaml"
 
 require "group"
+require "console_ui"
 
 class GroupFin
   
@@ -62,6 +63,7 @@ if __FILE__ == $0
       @g_hu = Group.new("hungarian friends", ["emil", "zoli", "bela", "sanya"])
       @exp_es = [8, 14]
       @exp_hu = [17, 20, 25, 6]
+      @console_ui = ConsoleMenu::UI.new
     end
     
     def test_init
@@ -118,5 +120,10 @@ if __FILE__ == $0
 #      assert_equal([@g_es, @g_hu, @g_fr], gf_reloaded.groups)
     end
     
+    def XXXtest_main_menu
+      random_io = RandomIO.new(11, "r", 10)
+      @console_ui.io_stream = random_io
+      #@console_ui.single_choice("fav. color?", ['blue', 'red', 'green'])
+    end
   end
 end
