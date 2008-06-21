@@ -1,6 +1,12 @@
 require "test/unit"
 
 class RandomIO < IO
+=begin
+Gives back a random integer between 0 and _max_+1 each time
+it is read or gets is called on it (mainly for testing reasons)
+it should be instantiated like this: 
+  RandomIO(fake_int_for_file_handler, mode_string, max)
+=end  
   def initialize(f, mode_string, max)
     super(f, mode_string)
     @max = max
@@ -14,6 +20,14 @@ class RandomIO < IO
 end
 
 class ConsoleUI
+  
+=begin
+  ConsoleUI takes an answer from the user and returns it. Answer codes are:
+  - a number if the question is of 'single choice' type
+  - a string if the question is of 'free input' type (the answer can be validated and is only
+  accepted once a valid answer is received from the user)
+  - a list of numbers if the question is of 'multiple choice' type
+=end  
   
   attr_accessor :prompt
   attr_accessor :io_stream
@@ -77,7 +91,7 @@ if __FILE__ == $0
       @test_prompt = '>'
       @console_ui = ConsoleUI.new(prompt=@test_prompt)
       @test_question = 'Who wins Euro\'08?'
-      @test_answers = ['Netherlands', 'Portugal', 'Spain', 'Turkey']
+      @test_answers = ['Netherlands', 'Portugal', 'Spain', 'Turkey', 'Germany']
     end
     def XXXtest_prompt
       answer = @console_ui.choose_between_answers(@test_question, @test_answers)
