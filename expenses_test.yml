@@ -1,0 +1,31 @@
+--- !ruby/object:GroupFin 
+db_file: expenses_test.yml
+groups: 
+- !ruby/object:Group 
+  expenses: 
+  - 8
+  - 14
+  members: 
+  - juan
+  - manuel
+  - xavi
+  name: spanish friends
+- !ruby/object:Group 
+  expenses: 
+  - 17
+  - 20
+  - 25
+  - 6
+  members: 
+  - emil
+  - zoli
+  - bela
+  - sanya
+  name: hungarian friends
+- !ruby/object:Group 
+  expenses: []
+
+  members: 
+  - robert
+  - guillaume
+  name: french friends
