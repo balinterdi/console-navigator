@@ -9,7 +9,7 @@ class RandomIO < IO
     rand(@max+1)
   end
   def gets
-    rand(@max+1)
+    read
   end
 end
 
@@ -93,9 +93,8 @@ if __FILE__ == $0
     end
     def test_random_io
       random_io = RandomIO.new(11, "r", 10)
-      10.times { |i| puts random_io.read }
-      #@console_ui.io_stream = random_io
-      #100.times { |i| assert_equal(true, (0...10).include?(@console_ui.take_answer)) }
+      @console_ui.io_stream = random_io
+      10.times { |i| assert_equal(true, (0..10).include?(@console_ui.take_answer)) }
     end
   end
   
