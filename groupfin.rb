@@ -121,7 +121,7 @@ if __FILE__ == $0
     end
     
     def XXXtest_main_menu
-      random_io = RandomIO.new(11, "r", 10)
+      random_io = RandomIO.new(10)
       @console_ui.io_stream = random_io
       #@console_ui.single_choice("fav. color?", ['blue', 'red', 'green'])
     end
