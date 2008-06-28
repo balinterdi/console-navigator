@@ -57,8 +57,12 @@ The nodes of the tree represent the menu items and are denoted by symbols
       # _choices_ which to choose from (if question is of :single_choice or :multiple_choice type)
       # _action_ is called when we arrive at that node.
       class NodeError < Exception
-      end   
+      end
       attr_reader :links
+      
+      def self.link_id(value)
+        value.to_s.to_sym
+      end
       
       def initialize(id, parent, question, q_type, choices={})
         @id = id
@@ -215,16 +219,21 @@ if __FILE__ == $0
       assert_equal({:esc => nil}, @main_node.links)
     end
     
+    def test_make_links_first_level
+      
+    end
+    
     def test_adding_choices_to_not_choice_based_question_throws_error
       node = ConsoleMenu::Navigator::Node.new(:main, nil, "please give me a number", :free_input)
       assert_raise(ConsoleMenu::Navigator::Node::NodeError) { node.choices = [] }
       # node.choices = []
     end
     
-    def test_make_links_first_level
-      
+    def test_link_id
+      assert_equal(:an_id, ConsoleMenu::Navigator::Node.link_id(:an_id))
+      assert_equal(:an_id, ConsoleMenu::Navigator::Node.link_id("an_id"))
+      assert_equal(:"1", ConsoleMenu::Navigator::Node.link_id(1))
     end
-    
   end
   
 end
