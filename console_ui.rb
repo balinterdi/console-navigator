@@ -40,10 +40,14 @@ The ConsoleMenu handles all navigation and ui related tasks for a console input
   
   class Navigator
 =begin
-ConsoleMenu::Navigator keeps track of where the user is located in the navigation tree.
-It asks questions and does other things accordingly.
-The nodes of the tree represent the menu items and are denoted by symbols 
-(e.g :main is the root of the tree)
+ConsoleMenu::Navigator keeps track of where the user is located in the navigation tree. It queries
+the actual node for the quetion it has to pose and forwards the answer coming from the UI to the node
+so the node can tell where should it go next. Somerhing along the lines of:
+- I am at node_x
+- question_and_valid_inputs = node_x.get_valid_options
+- user_answer = console_ui.get_answer_from_user(question_and_valid_inputs)
+- next_link = node_x.get_next_link(user_answer)
+- go_to_next_link (e.g node_y)
 =end
     attr_reader :location
 
@@ -53,6 +57,8 @@ The nodes of the tree represent the menu items and are denoted by symbols
     end
 
     class Node
+      # The nodes of the tree represent the menu items and are denoted by symbols 
+      # (e.g :main is the root of the tree)      
       # Navigation happens between nodes. A node has a _question_ (of _q_type_) and possibly
       # _choices_ which to choose from (if question is of :single_choice or :multiple_choice type)
       # _action_ is called when we arrive at that node.
@@ -88,6 +94,16 @@ The nodes of the tree represent the menu items and are denoted by symbols
         @choices = choices
         make_links
       end
+      
+      def get_choices_for_single_choice
+        # user-friendly indexing: starting from one instead of zero
+        choices_for_display = Hash.new
+        1.upto(@choices.length) do |i|
+          choices_for_display[i] = @choices[i-1]
+        end
+        return choices_for_display
+      end
+      
     end
     
   end
@@ -100,6 +116,11 @@ The nodes of the tree represent the menu items and are denoted by symbols
     accepted once a valid answer is received from the user)
     - a list of numbers if the question is of 'multiple choice' type
     - :esc if user wants to go up one level in the menu
+    TODO: the UI should just keep asking until it receives a valid input (valid meaning
+    an input that satisfies the given block). The question and answers should be passed to
+    it as parameters. 
+    Also, at initialization it takes some inputs that are always accepted and a mapping
+    of what entity (symbol) they are converted to before returning it.
 =end  
   
     attr_accessor :prompt
@@ -108,7 +129,6 @@ The nodes of the tree represent the menu items and are denoted by symbols
     def initialize(prompt='>', io_stream=nil)
       @prompt = prompt
       @io_stream = io_stream
-      # @answer_method = answer_method
     end
   
     def take_answer
@@ -120,27 +140,31 @@ The nodes of the tree represent the menu items and are denoted by symbols
       puts msg
       print @prompt + ' '
     end
-
-    def put_question
+    
+    def echo_answer(answer)
+      puts answer
     end
-  
-    def single_choice(question, answers)
+    
+    def ask(question, choices, valid_answers)
       out = []
-      # user-friendly indexing: starting from one instead of zero
-      user_friendly_indexed_answers = []
-      user_friendly_indexed_answers[0] = nil
-      0.upto(answers.length-1) { |idx| user_friendly_indexed_answers[idx+1] = answers[idx] }
-      1.upto(user_friendly_indexed_answers.length-1) { |idx| out << "#{idx} #{user_friendly_indexed_answers[idx]} \n" unless idx == 0 } 
-      out << "#{question}\n"
+      unless choices.empty?
+        1.upto(choices.length-1) { |idx| out << "#{idx} #{choices[idx]} \n" unless idx == 0 }
+      end
+      out << "#{question}\n" unless question.empty?
       puts out.join('')
       print @prompt + ' '
-      until (1...user_friendly_indexed_answers.length).include?(user_answer = gets.to_i) do
-         try_again("Please choose a valid option")
-       end
-      puts user_friendly_indexed_answers[user_answer]
-      return user_answer-1
+      unless valid_answers.nil?
+        until valid_answers.include?( user_answer = take_answer ) do
+          try_again("Please choose a valid option")
+        end
+      else
+        user_answer = take_answer
+      end
+      echo_answer(choices[user_answer])
+      return user_answer
     end
   
+    #TODO: this will have to be incorporated into the above ask method
     def free_input(question)
       out = []
       out << "#{question}\n"
@@ -168,6 +192,7 @@ if __FILE__ == $0
       @test_question = 'Who wins Euro\'08?'
       @test_answers = ['Netherlands', 'Portugal', 'Spain', 'Turkey', 'Germany']
       #---
+      @free_input_node = ConsoleMenu::Navigator::Node.new(:main, nil, "please tell me anything", :free_input)
       @main_node = ConsoleMenu::Navigator::Node.new(:main, nil, "please choose a group", :single_choice, ["Group selection", "Pick favorite team", "See results"])
       @group_sel_node = ConsoleMenu::Navigator::Node.new(:group_sel, @main_node, "please choose a group", :single_choice, ["Group A", "Group B", "Group C", "Group D"])
       @group_a_node = ConsoleMenu::Navigator::Node.new(:group_a, @main_node, "which team?", :single_choice, ['Switzerland', 'Portugal', 'Turkey', 'Czech Republic'])
@@ -179,6 +204,14 @@ if __FILE__ == $0
     def XXXtest_prompt
       answer = @console_ui.single_choice(@test_question, @test_answers)
       assert_equal(@test_prompt, answer[0,1])
+    end
+    def test_ask_with_single_choice
+      @console_ui.io_stream = SeriesIO.new(@test_answers.length)
+      assert_equal(true, (1..@test_answers.length).include?(@console_ui.ask(@test_question, @test_answers, nil))) 
+    end
+    def test_ask_with_free_input
+      @console_ui.io_stream = SeriesIO.new(('a'..'z').to_a)
+      assert_equal(true, ('a'..'z').include?(@console_ui.ask(@test_question, "Who are you?", nil)))
     end
     def XXXtest_single_choice
       answer = @console_ui.single_choice(@test_question, @test_answers)
@@ -224,8 +257,7 @@ if __FILE__ == $0
     end
     
     def test_adding_choices_to_not_choice_based_question_throws_error
-      node = ConsoleMenu::Navigator::Node.new(:main, nil, "please give me a number", :free_input)
-      assert_raise(ConsoleMenu::Navigator::Node::NodeError) { node.choices = [] }
+      assert_raise(ConsoleMenu::Navigator::Node::NodeError) { @free_input_node.choices = [] }
       # node.choices = []
     end
     
@@ -234,6 +266,12 @@ if __FILE__ == $0
       assert_equal(:an_id, ConsoleMenu::Navigator::Node.link_id("an_id"))
       assert_equal(:"1", ConsoleMenu::Navigator::Node.link_id(1))
     end
+    
+    def test_get_choices_for_single_choice
+      @group_sel_node = ConsoleMenu::Navigator::Node.new(:group_sel, @main_node, "please choose a group", :single_choice, ["Group A", "Group B", "Group C", "Group D"])      
+      assert_equal({1 => "Group A", 2 => "Group B", 3 => "Group C", 4 => "Group D"}, @group_sel_node.get_choices_for_single_choice)
+    end    
+    
   end
   
 end
