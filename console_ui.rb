@@ -1,3 +1,6 @@
+# TODO: instead of make_sorted_hash, sort the hash simply by Hash#sort that will give
+# an array of arrays.
+
 require "test/unit"
 
 class RandomIO < IO
@@ -114,8 +117,7 @@ so the node can tell where should it go next. Somerhing along the lines of:
       
       def get_question_data
         choices_for_question = get_choices_for_question_single_choice if @q_type == :single_choice
-        self.class.make_sorted_hash(choices_for_question)
-        return :question => @question, :choices => choices_for_question, :valid_answers => choices_for_question.keys.collect { |k| k.to_s }
+        return :question => @question, :choices => self.class.make_sorted_hash(choices_for_question), :valid_answers => choices_for_question.keys.collect { |k| k.to_s }
       end
       
       def get_choices_for_question_single_choice
@@ -155,7 +157,7 @@ so the node can tell where should it go next. Somerhing along the lines of:
     end
   
     def take_answer
-      io_stream.nil? ? gets : io_stream.gets
+      io_stream.nil? ? gets.chomp : io_stream.gets
     end
   
     def try_again(msg)
@@ -170,14 +172,18 @@ so the node can tell where should it go next. Somerhing along the lines of:
     
     def ask(question, choices, valid_answers)
       puts
-      puts "question: #{question}"
-      puts "choices: #{choices}"
-      puts "Valid answers: #{valid_answers.inspect}"
-      puts
+      # puts "question: #{question}"
+      puts "choices: #{choices.inspect}"
+      # puts "Valid answers: #{valid_answers.inspect}"
+      # puts
       out = []
       unless choices.empty?
-        1.upto(choices.length-1) { |idx| out << "#{idx} #{choices[idx]} \n" unless idx == 0 }
-      end
+        choices.each do |choice|
+          choice_id = choice.keys[0]
+          choice_title = choice[choice_id]
+          out << "#{choice_id} #{choice_title} \n"
+        end
+      end      
       out << "#{question}\n" unless question.empty?
       puts out.join('')
       print @prompt + ' '
@@ -188,7 +194,9 @@ so the node can tell where should it go next. Somerhing along the lines of:
       else
         user_answer = take_answer
       end
-      echo_answer(choices[user_answer])
+      #TODO: search for the answer indexed by user_answer in choices to be able to echo it back
+      # answer = choices.empty? ? user_answer : choices[user_answer.to_i][user_answer.to_i]
+      echo_answer(user_answer)
       return user_answer
     end
       
@@ -202,7 +210,7 @@ if __FILE__ == $0
       @test_prompt = '>'
       @console_ui = ConsoleMenu::UI.new(prompt=@test_prompt)
       @test_question = 'Who wins Euro\'08?'
-      @test_answers = ['Netherlands', 'Portugal', 'Spain', 'Turkey', 'Germany']
+      @test_answers = [ { 1 => 'Netherlands', 2 => 'Portugal', 3 => 'Spain', 4 => 'Turkey', 5 => 'Germany'} ]
       #---
       @free_input_node = ConsoleMenu::Navigator::Node.new(:main, nil, "please tell me anything", :free_input)
       @main_node = ConsoleMenu::Navigator::Node.new(:main, nil, "Main menu of Euro '08", :single_choice, ["Group selection", "Pick favorite team", "See results"])
@@ -223,7 +231,7 @@ if __FILE__ == $0
     end
     def test_ask_with_free_input
       @console_ui.io_stream = SeriesIO.new(('a'..'z').to_a)
-      assert_equal(true, ('a'..'z').include?(@console_ui.ask(@test_question, "Who are you?", nil)))
+      assert_equal(true, ('a'..'z').include?(@console_ui.ask("Who are you?", [], nil)))
     end
     def XXXtest_single_choice
       answer = @console_ui.single_choice(@test_question, @test_answers)
@@ -266,7 +274,7 @@ if __FILE__ == $0
       assert_equal(q_data_from_main_node[:valid_answers], q_data[:valid_answers])
     end
     
-    def XXXtest_x
+    def XXXtest_browse_start
       @navigator.browse
     end
     
