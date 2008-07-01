@@ -51,11 +51,22 @@ so the node can tell where should it go next. Somerhing along the lines of:
 =end
     attr_reader :location
 
-    def initialize(root)
+    def initialize(root, ui)
       @root = root
       @location = @root
+      @ui = ui
     end
 
+    def get_question_data
+      # just delegate the task to the node I'm at
+      @location.get_question_data
+    end
+
+    def browse
+      q_data = get_question_data
+      @ui.ask(q_data[:question], q_data[:choices], q_data[:valid_answers])
+    end
+    
     class Node
       # The nodes of the tree represent the menu items and are denoted by symbols 
       # (e.g :main is the root of the tree)      
@@ -69,7 +80,13 @@ so the node can tell where should it go next. Somerhing along the lines of:
       def self.link_id(value)
         value.to_s.to_sym
       end
-      
+
+      def self.make_sorted_hash(unsorted_hash)
+        sorted_hash = Array.new
+        unsorted_hash.each_pair { |k, v| sorted_hash.push({ k => v })  }
+        sorted_hash.sort { |h1, h2| h1.keys()[0] <=> h2.keys()[0] }
+      end
+            
       def initialize(id, parent, question, q_type, choices={})
         @id = id
         @parent = parent        
@@ -95,7 +112,13 @@ so the node can tell where should it go next. Somerhing along the lines of:
         make_links
       end
       
-      def get_choices_for_single_choice
+      def get_question_data
+        choices_for_question = get_choices_for_question_single_choice if @q_type == :single_choice
+        self.class.make_sorted_hash(choices_for_question)
+        return :question => @question, :choices => choices_for_question, :valid_answers => choices_for_question.keys.collect { |k| k.to_s }
+      end
+      
+      def get_choices_for_question_single_choice
         # user-friendly indexing: starting from one instead of zero
         choices_for_display = Hash.new
         1.upto(@choices.length) do |i|
@@ -146,6 +169,11 @@ so the node can tell where should it go next. Somerhing along the lines of:
     end
     
     def ask(question, choices, valid_answers)
+      puts
+      puts "question: #{question}"
+      puts "choices: #{choices}"
+      puts "Valid answers: #{valid_answers.inspect}"
+      puts
       out = []
       unless choices.empty?
         1.upto(choices.length-1) { |idx| out << "#{idx} #{choices[idx]} \n" unless idx == 0 }
@@ -163,23 +191,7 @@ so the node can tell where should it go next. Somerhing along the lines of:
       echo_answer(choices[user_answer])
       return user_answer
     end
-  
-    #TODO: this will have to be incorporated into the above ask method
-    def free_input(question)
-      out = []
-      out << "#{question}\n"
-      puts out.join()
-      print @prompt + ' '
-      if block_given?
-        until yield user_answer = take_answer do
-           try_again("Input is not correct")
-        end
-      else
-        user_answer = gets
-      end
-      user_answer.to_i
-    end
-    
+      
   end
     
 end
@@ -193,13 +205,13 @@ if __FILE__ == $0
       @test_answers = ['Netherlands', 'Portugal', 'Spain', 'Turkey', 'Germany']
       #---
       @free_input_node = ConsoleMenu::Navigator::Node.new(:main, nil, "please tell me anything", :free_input)
-      @main_node = ConsoleMenu::Navigator::Node.new(:main, nil, "please choose a group", :single_choice, ["Group selection", "Pick favorite team", "See results"])
+      @main_node = ConsoleMenu::Navigator::Node.new(:main, nil, "Main menu of Euro '08", :single_choice, ["Group selection", "Pick favorite team", "See results"])
       @group_sel_node = ConsoleMenu::Navigator::Node.new(:group_sel, @main_node, "please choose a group", :single_choice, ["Group A", "Group B", "Group C", "Group D"])
       @group_a_node = ConsoleMenu::Navigator::Node.new(:group_a, @main_node, "which team?", :single_choice, ['Switzerland', 'Portugal', 'Turkey', 'Czech Republic'])
       @group_b_node = ConsoleMenu::Navigator::Node.new(:group_b, @main_node, "which team?", :single_choice, ['Germany', 'Croatia', 'Poland', 'Austria'])
       @group_c_node = ConsoleMenu::Navigator::Node.new(:group_c, @main_node, "which team?", :single_choice, ['Netherlands', 'Italy', 'France', 'Romania'])
       @group_d_node = ConsoleMenu::Navigator::Node.new(:group_d, @main_node, "which team?", :single_choice, ['Spain', 'Russia', 'Greece', 'Sweden'])
-      @navigator = ConsoleMenu::Navigator.new(@main_node)
+      @navigator = ConsoleMenu::Navigator.new(@main_node, @console_ui)
     end
     def XXXtest_prompt
       answer = @console_ui.single_choice(@test_question, @test_answers)
@@ -246,14 +258,22 @@ if __FILE__ == $0
       assert_equal(@main_node, @navigator.location)
     end
     
+    def test_get_question_data
+      q_data = @navigator.get_question_data
+      q_data_from_main_node = @main_node.get_question_data
+      assert_equal(q_data_from_main_node[:question], q_data[:question])
+      assert_equal(q_data_from_main_node[:choices], q_data[:choices])
+      assert_equal(q_data_from_main_node[:valid_answers], q_data[:valid_answers])
+    end
+    
+    def XXXtest_x
+      @navigator.browse
+    end
+    
     # Node
     def test_make_links_main
       # def initialize(id, parent, question, q_type, object)    
       assert_equal({:esc => nil}, @main_node.links)
-    end
-    
-    def test_make_links_first_level
-      
     end
     
     def test_adding_choices_to_not_choice_based_question_throws_error
@@ -267,9 +287,13 @@ if __FILE__ == $0
       assert_equal(:"1", ConsoleMenu::Navigator::Node.link_id(1))
     end
     
-    def test_get_choices_for_single_choice
-      @group_sel_node = ConsoleMenu::Navigator::Node.new(:group_sel, @main_node, "please choose a group", :single_choice, ["Group A", "Group B", "Group C", "Group D"])      
-      assert_equal({1 => "Group A", 2 => "Group B", 3 => "Group C", 4 => "Group D"}, @group_sel_node.get_choices_for_single_choice)
+    def test_make_sorted_hash
+      assert_equal({}, {})
+      assert_equal([{ 1 => "Group A"}, { 2 => "Group B"}, { 3 => "Group C"}, { 4 => "Group D"} ], @main_node.class.make_sorted_hash({ 1 => "Group A", 4 => "Group D", 3 => "Group C", 2 => "Group B" }))
+    end
+    
+    def test_get_choices_for_question_single_choice
+      assert_equal({1 => "Group A", 2 => "Group B", 3 => "Group C", 4 => "Group D"}, @group_sel_node.get_choices_for_question_single_choice)
     end    
     
   end
