@@ -1,7 +1,12 @@
-# TODO: instead of make_sorted_hash, sort the hash simply by Hash#sort that will give
-# an array of arrays.
-
+=begin
+  TODO
+  - Node: choices are not needed separately but links have been given another data type that
+  establishes the link between the user answer and the node to go next when given that answer
+  - instead of make_sorted_hash, sort the hash simply by Hash#sort that will give an array of arrays.
+=end
 require "test/unit"
+require "yaml"
+
 
 class RandomIO < IO
 =begin
@@ -11,8 +16,8 @@ it gets is called on it
 it should be instantiated like this (till I find a nicer way): 
   RandomIO(fake_int_for_file_handler, mode_string, max)
 =end  
-  def initialize(max)
-    super(11, "r")
+  def initialize(fake_file_desc, max)
+    # super(fake_file_desc, "r")
     @max = max
   end
   def gets
@@ -22,8 +27,8 @@ it should be instantiated like this (till I find a nicer way):
 end
 
 class SeriesIO < IO
-  def initialize(series, circular=false)
-    super(11, "r")
+  def initialize(fake_file_desc, series, circular=false)
+    # super(fake_file_desc, "r")
     @series = series
     @circular = circular
     @idx = 0
@@ -58,6 +63,7 @@ so the node can tell where should it go next. Somerhing along the lines of:
       @root = root
       @location = @root
       @ui = ui
+      @prev_location = nil
     end
 
     def get_question_data
@@ -90,29 +96,13 @@ so the node can tell where should it go next. Somerhing along the lines of:
         sorted_hash.sort { |h1, h2| h1.keys()[0] <=> h2.keys()[0] }
       end
             
-      def initialize(id, parent, question, q_type, choices={})
+      def initialize(id, question, q_type, links)
         @id = id
-        @parent = parent        
         @question = question 
         @q_type = q_type # :free_input, :single_choice, :multiple_choice
-        @choices = choices
         #
-        @links = {}
+        @links = links
         @action = :pose_question
-        make_links
-      end
-      def make_links
-        @links[:esc] = @parent
-        # go through choices and make links whose key is the index of the choice
-        # (converted to symbol, like so :0, :1, :2, :3)
-        # @choices.each { |choice| @links[choice] }
-      end
-      
-      def choices=(choices)
-        raise NodeError, "Adding choices to not-choice-based question not allowed" \
-          unless [:single_choice, :multiple_choice].include?(@q_type)
-        @choices = choices
-        make_links
       end
       
       def get_question_data
@@ -123,8 +113,8 @@ so the node can tell where should it go next. Somerhing along the lines of:
       def get_choices_for_question_single_choice
         # user-friendly indexing: starting from one instead of zero
         choices_for_display = Hash.new
-        1.upto(@choices.length) do |i|
-          choices_for_display[i] = @choices[i-1]
+        1.upto(@links.length) do |i|
+          choices_for_display[i] = @links[i-1].values[0]
         end
         return choices_for_display
       end
@@ -206,19 +196,21 @@ end
 
 if __FILE__ == $0
   class ConsoleMenuTester < Test::Unit::TestCase
+    FakeFileDesc = 1
     def setup
       @test_prompt = '>'
       @console_ui = ConsoleMenu::UI.new(prompt=@test_prompt)
       @test_question = 'Who wins Euro\'08?'
       @test_answers = [ { 1 => 'Netherlands', 2 => 'Portugal', 3 => 'Spain', 4 => 'Turkey', 5 => 'Germany'} ]
       #---
-      @free_input_node = ConsoleMenu::Navigator::Node.new(:main, nil, "please tell me anything", :free_input)
-      @main_node = ConsoleMenu::Navigator::Node.new(:main, nil, "Main menu of Euro '08", :single_choice, ["Group selection", "Pick favorite team", "See results"])
-      @group_sel_node = ConsoleMenu::Navigator::Node.new(:group_sel, @main_node, "please choose a group", :single_choice, ["Group A", "Group B", "Group C", "Group D"])
-      @group_a_node = ConsoleMenu::Navigator::Node.new(:group_a, @main_node, "which team?", :single_choice, ['Switzerland', 'Portugal', 'Turkey', 'Czech Republic'])
-      @group_b_node = ConsoleMenu::Navigator::Node.new(:group_b, @main_node, "which team?", :single_choice, ['Germany', 'Croatia', 'Poland', 'Austria'])
-      @group_c_node = ConsoleMenu::Navigator::Node.new(:group_c, @main_node, "which team?", :single_choice, ['Netherlands', 'Italy', 'France', 'Romania'])
-      @group_d_node = ConsoleMenu::Navigator::Node.new(:group_d, @main_node, "which team?", :single_choice, ['Spain', 'Russia', 'Greece', 'Sweden'])
+      
+      @free_input_node = ConsoleMenu::Navigator::Node.new(:main, "please tell me anything", :free_input, [])
+      @main_node = ConsoleMenu::Navigator::Node.new(:main, "Main menu of Euro '08", :single_choice, [{:group_sel => "Group selection"}, {:pick_fav_team => "Pick favorite team"}, { :see_results => "See results" }])
+      @group_sel_node = ConsoleMenu::Navigator::Node.new(:group_sel, "please choose a group", :single_choice, [{:group_a => "Group A"}, { :group_b => "Group B" }, { :group_c => "Group C" }, { :group_d => "Group D"}])
+      @group_a_node = ConsoleMenu::Navigator::Node.new(:group_a, "which team?", :single_choice, [:switzerland => 'Switzerland', :portugal => 'Portugal', :turkey => 'Turkey', :czechrepublic => 'Czech Republic'])
+      # @group_b_node = ConsoleMenu::Navigator::Node.new(:group_b, @main_node, "which team?", :single_choice, ['Germany', 'Croatia', 'Poland', 'Austria'])
+      # @group_c_node = ConsoleMenu::Navigator::Node.new(:group_c, @main_node, "which team?", :single_choice, ['Netherlands', 'Italy', 'France', 'Romania'])
+      # @group_d_node = ConsoleMenu::Navigator::Node.new(:group_d, @main_node, "which team?", :single_choice, ['Spain', 'Russia', 'Greece', 'Sweden'])
       @navigator = ConsoleMenu::Navigator.new(@main_node, @console_ui)
     end
     def XXXtest_prompt
@@ -226,11 +218,11 @@ if __FILE__ == $0
       assert_equal(@test_prompt, answer[0,1])
     end
     def test_ask_with_single_choice
-      @console_ui.io_stream = SeriesIO.new(@test_answers.length)
+      @console_ui.io_stream = SeriesIO.new(FakeFileDesc, @test_answers.length)
       assert_equal(true, (1..@test_answers.length).include?(@console_ui.ask(@test_question, @test_answers, nil))) 
     end
     def test_ask_with_free_input
-      @console_ui.io_stream = SeriesIO.new(('a'..'z').to_a)
+      @console_ui.io_stream = SeriesIO.new(FakeFileDesc, ('a'..'z').to_a)
       assert_equal(true, ('a'..'z').include?(@console_ui.ask("Who are you?", [], nil)))
     end
     def XXXtest_single_choice
@@ -242,13 +234,13 @@ if __FILE__ == $0
       assert_equal(true, (1..5).include?(answer.to_i))
     end
     def test_random_io
-      random_io = RandomIO.new(10)
+      random_io = RandomIO.new(FakeFileDesc, 10)
       @console_ui.io_stream = random_io
       10.times { |i| assert_equal(true, (0..10).include?(@console_ui.take_answer)) }
     end
     def test_series_io
       groups = [:group_a, :group_b, :group_c, :group_d]
-      series_io = SeriesIO.new(groups)
+      series_io = SeriesIO.new(FakeFileDesc, groups)
       assert_equal(:group_a, series_io.gets)
       assert_equal(:group_b, series_io.gets)
       assert_equal(:group_c, series_io.gets)
@@ -257,7 +249,7 @@ if __FILE__ == $0
     end
     def test_circular_series_io
       groups = [:group_a, :group_b, :group_c, :group_d]
-      circular_series_io = SeriesIO.new(groups, true)
+      circular_series_io = SeriesIO.new(FakeFileDesc, groups, true)
       groups.length.times { |n| circular_series_io.gets }
       assert_equal(:group_a, circular_series_io.gets )
     end
@@ -274,21 +266,15 @@ if __FILE__ == $0
       assert_equal(q_data_from_main_node[:valid_answers], q_data[:valid_answers])
     end
     
+    def XXXtest_make_the_menu
+      @navigator.make_the_menu([@main_node, @group_sel_node].map { |node| node.to_yaml }) 
+    end
+    
     def XXXtest_browse_start
       @navigator.browse
     end
     
-    # Node
-    def test_make_links_main
-      # def initialize(id, parent, question, q_type, object)    
-      assert_equal({:esc => nil}, @main_node.links)
-    end
-    
-    def test_adding_choices_to_not_choice_based_question_throws_error
-      assert_raise(ConsoleMenu::Navigator::Node::NodeError) { @free_input_node.choices = [] }
-      # node.choices = []
-    end
-    
+    # Node    
     def test_link_id
       assert_equal(:an_id, ConsoleMenu::Navigator::Node.link_id(:an_id))
       assert_equal(:an_id, ConsoleMenu::Navigator::Node.link_id("an_id"))
