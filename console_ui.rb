@@ -113,9 +113,7 @@ so the node can tell where should it go next. Somerhing along the lines of:
       def get_choices_for_question_single_choice
         # user-friendly indexing: starting from one instead of zero
         choices_for_display = Hash.new
-        1.upto(@links.length) do |i|
-          choices_for_display[i] = @links[i-1].values[0]
-        end
+        links.each_pair { |link_id, link_data| choices_for_display[link_id] = link_data[:title] }
         return choices_for_display
       end
       
@@ -161,11 +159,6 @@ so the node can tell where should it go next. Somerhing along the lines of:
     end
     
     def ask(question, choices, valid_answers)
-      puts
-      # puts "question: #{question}"
-      puts "choices: #{choices.inspect}"
-      # puts "Valid answers: #{valid_answers.inspect}"
-      # puts
       out = []
       unless choices.empty?
         choices.each do |choice|
@@ -184,8 +177,6 @@ so the node can tell where should it go next. Somerhing along the lines of:
       else
         user_answer = take_answer
       end
-      #TODO: search for the answer indexed by user_answer in choices to be able to echo it back
-      # answer = choices.empty? ? user_answer : choices[user_answer.to_i][user_answer.to_i]
       echo_answer(user_answer)
       return user_answer
     end
@@ -203,11 +194,10 @@ if __FILE__ == $0
       @test_question = 'Who wins Euro\'08?'
       @test_answers = [ { 1 => 'Netherlands', 2 => 'Portugal', 3 => 'Spain', 4 => 'Turkey', 5 => 'Germany'} ]
       #---
-      
       @free_input_node = ConsoleMenu::Navigator::Node.new(:main, "please tell me anything", :free_input, [])
-      @main_node = ConsoleMenu::Navigator::Node.new(:main, "Main menu of Euro '08", :single_choice, [{:group_sel => "Group selection"}, {:pick_fav_team => "Pick favorite team"}, { :see_results => "See results" }])
-      @group_sel_node = ConsoleMenu::Navigator::Node.new(:group_sel, "please choose a group", :single_choice, [{:group_a => "Group A"}, { :group_b => "Group B" }, { :group_c => "Group C" }, { :group_d => "Group D"}])
-      @group_a_node = ConsoleMenu::Navigator::Node.new(:group_a, "which team?", :single_choice, [:switzerland => 'Switzerland', :portugal => 'Portugal', :turkey => 'Turkey', :czechrepublic => 'Czech Republic'])
+      @main_node = ConsoleMenu::Navigator::Node.new(:main, "Main menu of Euro '08", :single_choice, { 1 => { :link_id => :group_sel, :title => "Group selection" }, 2 => { :link_id => :pick_fav_team, :title => "Pick favorite team" }, 3 => { :link_id => :see_results, :title => "See results" }})
+      @group_sel_node = ConsoleMenu::Navigator::Node.new(:group_sel, "please choose a group", :single_choice, { 1 => { :link_id => :group_a, :title => "Group A"}, 2 => { :link_id => :group_b, :title => "Group B" }, 3 => { :link_id => :group_c, :title => "Group C" }, 4 => { :link_id => :group_d, :title => "Group D"}})
+      @group_a_node = ConsoleMenu::Navigator::Node.new(:group_a, "which team?", :single_choice, { 1 => { :link_id => :switzerland, :title => 'Switzerland'}, 2 => { :link_id => :portugal, :title => 'Portugal'}, 3 => { :link_id => :turkey, :title => 'Turkey'}, 4 => { :link_id => :czechrepublic, :title => 'Czech Republic'}})
       # @group_b_node = ConsoleMenu::Navigator::Node.new(:group_b, @main_node, "which team?", :single_choice, ['Germany', 'Croatia', 'Poland', 'Austria'])
       # @group_c_node = ConsoleMenu::Navigator::Node.new(:group_c, @main_node, "which team?", :single_choice, ['Netherlands', 'Italy', 'France', 'Romania'])
       # @group_d_node = ConsoleMenu::Navigator::Node.new(:group_d, @main_node, "which team?", :single_choice, ['Spain', 'Russia', 'Greece', 'Sweden'])
@@ -270,7 +260,7 @@ if __FILE__ == $0
       @navigator.make_the_menu([@main_node, @group_sel_node].map { |node| node.to_yaml }) 
     end
     
-    def XXXtest_browse_start
+    def test_browse_start
       @navigator.browse
     end
     
