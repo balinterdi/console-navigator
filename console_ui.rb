@@ -70,16 +70,22 @@ so the node can tell where should it go next. Somerhing along the lines of:
 =end
     attr_reader :location, :nodes
 
-    def initialize(root, ui)
-      #FIXME: there should be no assigned root, since this is not a tree
-      @root = root
-      @location = @root
+    def initialize(loc, ui)
+      @location = loc
       @ui = ui
       @prev_location = nil
+      @menu_nav_keys = Hash.new
       @nodes = Hash.new
-      add_nodes(root)
+      add_menu_nav_keys
+      add_nodes(loc)
     end
 
+    def add_menu_nav_keys
+      @menu_nav_keys['\e'] = Proc.new { go_to_main }
+      # @menu_nav_keys['\e[D'] = go_back
+      # @menu_nav_keys['\e[C'] = go_forward
+    end
+    
     def add_nodes(*nodes)
       nodes.each do |node|
         @nodes[node.get_id] = node
@@ -93,12 +99,16 @@ so the node can tell where should it go next. Somerhing along the lines of:
     def get_user_answer
       # just delegate the task to the node I'm at
       q_data = @location.get_question_data
-      return @ui.ask(q_data[:question], q_data[:choices], q_data[:valid_answers])      
+      return @ui.ask(q_data[:question], q_data[:choices], q_data[:valid_answers].concat(@menu_nav_keys.keys))    
     end
     
     def get_next_node
       answer = get_user_answer
-      next_node_id = @location.get_link_id_for_answer(answer)
+      if @menu_nav_keys.key?(answer)
+        next_node_id = @menu_nav_keys[answer].call
+      else
+        next_node_id = @location.get_link_id_for_answer(answer)
+      end
       find_node(next_node_id)
     end
 
@@ -107,10 +117,18 @@ so the node can tell where should it go next. Somerhing along the lines of:
       @location = node
     end
     
+    def go_to_main
+      @prev_location = @location
+      @location = find_node(:main)
+      @location.get_id
+    end
+    
     def go_back
       @location = @prev_location
-      @prev_location = nil      
+      @prev_location = nil
+      @location.get_id
     end
+    
     
     def browse
       while true
@@ -252,10 +270,13 @@ if __FILE__ == $0
       @main_node = ConsoleMenu::Navigator::Node.new(:main, "Main menu of Euro '08", :single_choice, { "1" => { :link_id => :group_sel, :title => "Group selection" }, "2" => { :link_id => :pick_fav_team, :title => "Pick favorite team" }, "3" => { :link_id => :see_results, :title => "See results" }})
       @group_sel_node = ConsoleMenu::Navigator::Node.new(:group_sel, "please choose a group", :single_choice, { "1" => { :link_id => :group_a, :title => "Group A"}, "2" => { :link_id => :group_b, :title => "Group B" }, "3" => { :link_id => :group_c, :title => "Group C" }, "4" => { :link_id => :group_d, :title => "Group D"}})
       @group_a_node = ConsoleMenu::Navigator::Node.new(:group_a, "which team?", :single_choice, { "1" => { :link_id => :switzerland, :title => 'Switzerland'}, "2" => { :link_id => :portugal, :title => 'Portugal'}, "3" => { :link_id => :turkey, :title => 'Turkey'}, "4" => { :link_id => :czechrepublic, :title => 'Czech Republic'}})
-      # @group_b_node = ConsoleMenu::Navigator::Node.new(:group_b, @main_node, "which team?", :single_choice, ['Germany', 'Croatia', 'Poland', 'Austria'])
-      # @group_c_node = ConsoleMenu::Navigator::Node.new(:group_c, @main_node, "which team?", :single_choice, ['Netherlands', 'Italy', 'France', 'Romania'])
-      # @group_d_node = ConsoleMenu::Navigator::Node.new(:group_d, @main_node, "which team?", :single_choice, ['Spain', 'Russia', 'Greece', 'Sweden'])
+      @group_b_node = ConsoleMenu::Navigator::Node.new(:group_b, "which team?", :single_choice, { "1" => { :link_id => :germany, :title => 'Germany'}, "2" => { :link_id => :poland, :title => 'Poland'}, "3" => { :link_id => :croatia, :title => 'Croatia'}, "4" => { :link_id => :austria, :title => 'Austria'}})
+      @group_c_node = ConsoleMenu::Navigator::Node.new(:group_c, "which team?", :single_choice, { "1" => { :link_id => :netherlands, :title => 'Netherlands'}, "2" => { :link_id => :italy, :title => 'Italy'}, "3" => { :link_id => :france, :title => 'France'}, "4" => { :link_id => :romania, :title => 'Romania'}})
+      @group_d_node = ConsoleMenu::Navigator::Node.new(:group_d, "which team?", :single_choice, { "1" => { :link_id => :spain, :title => 'Spain'}, "2" => { :link_id => :russia, :title => 'Russia'}, "3" => { :link_id => :greece, :title => 'Greece'}, "4" => { :link_id => :sweden, :title => 'Sweden'}})
       @navigator = ConsoleMenu::Navigator.new(@main_node, @console_ui)
+    end
+    def load_nodes_to_navigator
+      @navigator.add_nodes(@main_node, @group_sel_node, @group_a_node, @group_b_node, @group_c_node, @group_d_node)
     end
     def XXXtest_prompt
       answer = @console_ui.single_choice(@test_question, @test_answers)
@@ -338,12 +359,23 @@ if __FILE__ == $0
       assert_equal(q_data_from_main_node[:valid_answers], q_data[:valid_answers])
     end
     
-    def test_get_next_node
+    def test_gets_next_node
       fix_io = FixIO.new(FakeFileDesc, "1")
       @console_ui.io_stream = fix_io
       @navigator.add_nodes(@group_sel_node, @group_a_node)      
       assert_equal(@main_node, @navigator.location)
       assert_equal(@group_sel_node, @navigator.get_next_node)
+    end
+
+    def test_goes_to_main
+      fix_io = FixIO.new(FakeFileDesc, "1")
+      @console_ui.io_stream = fix_io
+      load_nodes_to_navigator
+      2.times { |n| @navigator.go_to(@navigator.get_next_node) }
+      assert_equal(@group_a_node, @navigator.location)
+      fix_io.out_data = '\e'
+      @navigator.go_to(@navigator.get_next_node)
+      assert_equal(@main_node, @navigator.location)
     end
     
     def XXXtest_make_the_menu
@@ -357,6 +389,7 @@ if __FILE__ == $0
     end
         
     def XXXtest_browse_start
+      load_nodes_to_navigator
       @navigator.browse
     end
     
