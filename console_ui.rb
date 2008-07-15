@@ -107,6 +107,8 @@ so the node can tell where should it go next. Somerhing along the lines of:
       if @menu_nav_keys.key?(answer)
         next_node_id = @menu_nav_keys[answer].call
       else
+        link_action = @location.get_link_action_for_answer(answer)
+        link_action.call(answer) if link_action
         next_node_id = @location.get_link_id_for_answer(answer)
       end
       find_node(next_node_id)
@@ -132,7 +134,8 @@ so the node can tell where should it go next. Somerhing along the lines of:
     
     def browse
       while true
-        go_to(get_next_node)
+        next_node = get_next_node
+        go_to(next_node)
       end
     end
     
@@ -180,10 +183,18 @@ so the node can tell where should it go next. Somerhing along the lines of:
         links.each_pair { |link_id, link_data| choices_for_display[link_id] = link_data[:title] }
         return choices_for_display
       end
+
+      def get_link_attribute_for_answer(answer, property)
+        link = @links.find { |link| link[0] == answer }
+        return link[1][property] unless link.nil?        
+      end
+      
+      def get_link_action_for_answer(answer)
+        get_link_attribute_for_answer(answer, :action)
+      end
       
       def get_link_id_for_answer(answer)
-        link = @links.find { |link|  link[0] == answer }
-        return link[1][:link_id] unless link.nil?
+        get_link_attribute_for_answer(answer, :link_id)
       end
       
     end
@@ -267,7 +278,7 @@ if __FILE__ == $0
       @test_answers = [ { 1 => 'Netherlands', 2 => 'Portugal', 3 => 'Spain', 4 => 'Turkey', 5 => 'Germany'} ]
       #---
       @free_input_node = ConsoleMenu::Navigator::Node.new(:main, "please tell me anything", :free_input, [])
-      @main_node = ConsoleMenu::Navigator::Node.new(:main, "Main menu of Euro '08", :single_choice, { "1" => { :link_id => :group_sel, :title => "Group selection" }, "2" => { :link_id => :pick_fav_team, :title => "Pick favorite team" }, "3" => { :link_id => :see_results, :title => "See results" }})
+      @main_node = ConsoleMenu::Navigator::Node.new(:main, "Main menu of Euro '08", :single_choice, { "1" => { :link_id => :group_sel, :title => "Group selection" }, "2" => { :link_id => :pick_fav_team, :title => "Pick favorite team", :action => Proc.new { |x| puts "Euro is over, you can not pick a fav. team"} }, "3" => { :link_id => :see_results, :title => "See results" }})
       @group_sel_node = ConsoleMenu::Navigator::Node.new(:group_sel, "please choose a group", :single_choice, { "1" => { :link_id => :group_a, :title => "Group A"}, "2" => { :link_id => :group_b, :title => "Group B" }, "3" => { :link_id => :group_c, :title => "Group C" }, "4" => { :link_id => :group_d, :title => "Group D"}})
       @group_a_node = ConsoleMenu::Navigator::Node.new(:group_a, "which team?", :single_choice, { "1" => { :link_id => :switzerland, :title => 'Switzerland'}, "2" => { :link_id => :portugal, :title => 'Portugal'}, "3" => { :link_id => :turkey, :title => 'Turkey'}, "4" => { :link_id => :czechrepublic, :title => 'Czech Republic'}})
       @group_b_node = ConsoleMenu::Navigator::Node.new(:group_b, "which team?", :single_choice, { "1" => { :link_id => :germany, :title => 'Germany'}, "2" => { :link_id => :poland, :title => 'Poland'}, "3" => { :link_id => :croatia, :title => 'Croatia'}, "4" => { :link_id => :austria, :title => 'Austria'}})
@@ -387,7 +398,14 @@ if __FILE__ == $0
       @navigator.go_back
       assert_equal(@main_node, @navigator.location)
     end
-        
+    
+    def test_does_action
+      fix_io = FixIO.new(FakeFileDesc, "2")
+      @console_ui.io_stream = fix_io
+      load_nodes_to_navigator
+      @navigator.go_to(@navigator.get_next_node)
+    end
+    
     def XXXtest_browse_start
       load_nodes_to_navigator
       @navigator.browse
