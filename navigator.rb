@@ -86,10 +86,14 @@ module ConsoleNavigator
 	  end
      
 	  def save_objects
+			serialized_objects = Array.new
 	    @navigation_objects.each do |obj|
+				serialized_objects.push(obj.serialized_form)
 	      obj.mark_saved
-	      obj.save
 	    end
+			File.open("saved_objects.yml", "w") do |f|
+				f.write(serialized_objects)
+			end
 	  end
      
 	  def browse

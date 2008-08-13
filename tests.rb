@@ -174,16 +174,12 @@ if __FILE__ == $0
     def test_saves_objects
       fix_io = FixIO.new(FakeFileDesc, "10 dollars")
       @console_ui.io_stream = fix_io
-      @navigator = ConsoleNavigator::Navigator.new(@ticket_q_node, @console_ui)
-      @navigator.get_next_node
-      @navigator.save_objects
-      assert_equal(@navigator.navigation_objects.length, @navigator.navigation_objects.select { |obj| obj.saved? }.length )
+      navigator = ConsoleNavigator::Navigator.new(@ticket_q_node, @console_ui)
+      navigator.get_next_node
+      navigator.save_objects
+      assert_equal(navigator.navigation_objects.length, navigator.navigation_objects.select { |obj| obj.saved? }.length )
     end
     
-    def XXXtest_make_the_menu
-      @navigator.make_the_menu([@main_node, @group_sel_node].map { |node| node.to_yaml }) 
-    end    
-
     def test_go_back
       @navigator.go_to(@group_sel_node)
       @navigator.go_back
@@ -193,9 +189,9 @@ if __FILE__ == $0
     def test_does_node_action
       fix_io = FixIO.new(FakeFileDesc, "10 dollars")
       @console_ui.io_stream = fix_io
-      @navigator = ConsoleNavigator::Navigator.new(@ticket_q_node, @console_ui)
-      @navigator.get_next_node
-      assert_equal("10 dollars", @navigator.navigation_objects.first.value)
+      navigator = ConsoleNavigator::Navigator.new(@ticket_q_node, @console_ui)
+      navigator.get_next_node
+      assert_equal("10 dollars", navigator.navigation_objects.first.value)
     end
     
     def test_does_link_action
@@ -207,7 +203,8 @@ if __FILE__ == $0
     end
     
     def XXXtest_browse_start
-      load_nodes_to_navigator
+	    @navigator = ConsoleNavigator::Navigator.new(@ticket_q_node, @console_ui) 
+      # load_nodes_to_navigator
       @navigator.browse
     end
     
