@@ -54,19 +54,19 @@ if __FILE__ == $0
     FakeFileDesc = 1
     def setup
       @test_prompt = '>'
-      @console_ui = UI.new(prompt=@test_prompt)
+      @console_ui = ConsoleNavigator::UI.new(prompt=@test_prompt)
       @test_question = 'Who wins Euro\'08?'
       @test_answers = [ { 1 => 'Netherlands', 2 => 'Portugal', 3 => 'Spain', 4 => 'Turkey', 5 => 'Germany'} ]
       #---
-      @free_input_node = Node.new(:main, "please tell me anything", :free_input, nil, {})
-      @main_node = Node.new(:main, "Main menu of Euro '08", :single_choice, nil, { "1" => { :link_id => :group_sel, :title => "Group selection" }, "2" => { :link_id => :pick_fav_team, :title => "Pick favorite team", :action => "make_navigation_object" }, "3" => { :link_id => :see_results, :title => "See results" }})
-      @group_sel_node = Node.new(:group_sel, "please choose a group", :single_choice, nil, { "1" => { :link_id => :group_a, :title => "Group A"}, "2" => { :link_id => :group_b, :title => "Group B" }, "3" => { :link_id => :group_c, :title => "Group C" }, "4" => { :link_id => :group_d, :title => "Group D"}})
-      @group_a_node = Node.new(:group_a, "which team?", :single_choice, nil, { "1" => { :link_id => :switzerland, :title => 'Switzerland'}, "2" => { :link_id => :portugal, :title => 'Portugal'}, "3" => { :link_id => :turkey, :title => 'Turkey'}, "4" => { :link_id => :czechrepublic, :title => 'Czech Republic'}})
-      @group_b_node = Node.new(:group_b, "which team?", :single_choice, nil, { "1" => { :link_id => :germany, :title => 'Germany'}, "2" => { :link_id => :poland, :title => 'Poland'}, "3" => { :link_id => :croatia, :title => 'Croatia'}, "4" => { :link_id => :austria, :title => 'Austria'}})
-      @group_c_node = Node.new(:group_c, "which team?", :single_choice, nil, { "1" => { :link_id => :netherlands, :title => 'Netherlands'}, "2" => { :link_id => :italy, :title => 'Italy'}, "3" => { :link_id => :france, :title => 'France'}, "4" => { :link_id => :romania, :title => 'Romania'}})
-      @group_d_node = Node.new(:group_d, "which team?", :single_choice, nil, { "1" => { :link_id => :spain, :title => 'Spain'}, "2" => { :link_id => :russia, :title => 'Russia'}, "3" => { :link_id => :greece, :title => 'Greece'}, "4" => { :link_id => :sweden, :title => 'Sweden'}})
-      @ticket_q_node = Node.new(:main, "how much did the ticket cost?", :free_input, Proc.new { |value| NavigationObject.new(value) }, {})
-      @navigator = Navigator.new(@main_node, @console_ui)
+      @free_input_node = ConsoleNavigator::Node.new(:main, "please tell me anything", :free_input, nil, {})
+      @main_node = ConsoleNavigator::Node.new(:main, "Main menu of Euro '08", :single_choice, nil, { "1" => { :link_id => :group_sel, :title => "Group selection" }, "2" => { :link_id => :pick_fav_team, :title => "Pick favorite team", :action => "make_navigation_object" }, "3" => { :link_id => :see_results, :title => "See results" }})
+      @group_sel_node = ConsoleNavigator::Node.new(:group_sel, "please choose a group", :single_choice, nil, { "1" => { :link_id => :group_a, :title => "Group A"}, "2" => { :link_id => :group_b, :title => "Group B" }, "3" => { :link_id => :group_c, :title => "Group C" }, "4" => { :link_id => :group_d, :title => "Group D"}})
+      @group_a_node = ConsoleNavigator::Node.new(:group_a, "which team?", :single_choice, nil, { "1" => { :link_id => :switzerland, :title => 'Switzerland'}, "2" => { :link_id => :portugal, :title => 'Portugal'}, "3" => { :link_id => :turkey, :title => 'Turkey'}, "4" => { :link_id => :czechrepublic, :title => 'Czech Republic'}})
+      @group_b_node = ConsoleNavigator::Node.new(:group_b, "which team?", :single_choice, nil, { "1" => { :link_id => :germany, :title => 'Germany'}, "2" => { :link_id => :poland, :title => 'Poland'}, "3" => { :link_id => :croatia, :title => 'Croatia'}, "4" => { :link_id => :austria, :title => 'Austria'}})
+      @group_c_node = ConsoleNavigator::Node.new(:group_c, "which team?", :single_choice, nil, { "1" => { :link_id => :netherlands, :title => 'Netherlands'}, "2" => { :link_id => :italy, :title => 'Italy'}, "3" => { :link_id => :france, :title => 'France'}, "4" => { :link_id => :romania, :title => 'Romania'}})
+      @group_d_node = ConsoleNavigator::Node.new(:group_d, "which team?", :single_choice, nil, { "1" => { :link_id => :spain, :title => 'Spain'}, "2" => { :link_id => :russia, :title => 'Russia'}, "3" => { :link_id => :greece, :title => 'Greece'}, "4" => { :link_id => :sweden, :title => 'Sweden'}})
+      @ticket_q_node = ConsoleNavigator::Node.new(:main, "how much did the ticket cost?", :free_input, Proc.new { |value| ConsoleNavigator::NavigationObject.new(value) }, {})
+      @navigator = ConsoleNavigator::Navigator.new(@main_node, @console_ui)
     end
     def load_nodes_to_navigator
       @navigator.add_nodes(@main_node, @group_sel_node, @group_a_node, @group_b_node, @group_c_node, @group_d_node)
@@ -174,7 +174,7 @@ if __FILE__ == $0
     def test_saves_objects
       fix_io = FixIO.new(FakeFileDesc, "10 dollars")
       @console_ui.io_stream = fix_io
-      @navigator = Navigator.new(@ticket_q_node, @console_ui)
+      @navigator = ConsoleNavigator::Navigator.new(@ticket_q_node, @console_ui)
       @navigator.get_next_node
       @navigator.save_objects
       assert_equal(@navigator.navigation_objects.length, @navigator.navigation_objects.select { |obj| obj.saved? }.length )
@@ -193,7 +193,7 @@ if __FILE__ == $0
     def test_does_node_action
       fix_io = FixIO.new(FakeFileDesc, "10 dollars")
       @console_ui.io_stream = fix_io
-      @navigator = Navigator.new(@ticket_q_node, @console_ui)
+      @navigator = ConsoleNavigator::Navigator.new(@ticket_q_node, @console_ui)
       @navigator.get_next_node
       assert_equal("10 dollars", @navigator.navigation_objects.first.value)
     end
@@ -211,11 +211,11 @@ if __FILE__ == $0
       @navigator.browse
     end
     
-    # Node    
+    # ConsoleNavigator::Node    
     def test_link_id
-      assert_equal(:an_id, Node.link_id(:an_id))
-      assert_equal(:an_id, Node.link_id("an_id"))
-      assert_equal(:"1", Node.link_id(1))
+      assert_equal(:an_id, ConsoleNavigator::Node.link_id(:an_id))
+      assert_equal(:an_id, ConsoleNavigator::Node.link_id("an_id"))
+      assert_equal(:"1", ConsoleNavigator::Node.link_id(1))
     end
     
     def test_make_sorted_hash
@@ -229,7 +229,7 @@ if __FILE__ == $0
     
     #-----
     def XXXtest_creating_an_expense
-      @expense_input_node = Node.new(:main, "so how much did you pay?", :free_input, node_action, {})
+      @expense_input_node = ConsoleNavigator::Node.new(:main, "so how much did you pay?", :free_input, node_action, {})
       @navigator = Navigator.new(@expense_input_node, @console_ui)
       @navigator.browse
     end
